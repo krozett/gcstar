@@ -85,7 +85,7 @@ name="GCTVseries">
 				imported="false"/>
 		<field value="name"
 				group="main"
-				init="%series% - Season %season%"
+				init="=~series~ . ' - ' . (%specialep% ? ~title~ : 'Season %season%')"
 				label="Name"
 				type="formatted" />
 		<field value="series"

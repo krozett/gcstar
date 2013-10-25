@@ -339,13 +339,16 @@ use strict;
         $label =~ s/\=(\w*)([^\=]*)\=/($self->{show}->{$1}) ? $2 : ''/eg;
         
         # Allow formatting using %fields[format]%
+        # Or ~fields[format]~ to escape and wrap in single quotes (useful in eval syntax)
         if ($info)
         {
             $label =~ s/%(.*?)(\[(.*?)\])*%/$3 ? sprintf($3,$info->{$1}) : $info->{$1}/eg;
+            $label =~ s/~(.*?)(\[(.*?)\])*~/GCUtils::quote($3 ? sprintf($3,$info->{$1}) : $info->{$1})/eg;
         }
         else
         {
             $label =~ s/%(.*?)(\[(.*?)\])*%/$3 ? sprintf($3,$self->{$1}->getValue(1)) : $self->{$1}->getValue(1)/eg;
+            $label =~ s/~(.*?)(\[(.*?)\])*~/GCUtils::quote($3 ? sprintf($3,$self->{$1}->getValue(1)) : $self->{$1}->getValue(1))/eg;
         }
         if ($label =~ /^=(.*)$/)
         {

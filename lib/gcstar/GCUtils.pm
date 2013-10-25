@@ -189,6 +189,14 @@ sub RtfToString
     return $str;
 }
 
+# Wraps a string in single quotes and escapes any single quotes inside it
+sub quote
+{
+    my $val = shift;
+
+    $val =~ s/'/\\'/g;
+    return "'$val'";
+}
 
 {
     package GCPreProcess;
