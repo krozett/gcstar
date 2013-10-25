@@ -1386,7 +1386,14 @@ our $linkNameSeparator = '##';
         my $self = shift;
         return 1;
     }
-    
+
+    # Required to use current class as a parameter of backend
+    sub addFieldsToDefaultModel
+    {
+        my $self = shift;
+        return;
+    }
+
     # Required to use current class as a parameter of backend
     sub transformPicturePath
     {
