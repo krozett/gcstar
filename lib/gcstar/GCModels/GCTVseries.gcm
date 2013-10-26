@@ -63,6 +63,8 @@ name="GCTVseries">
 			<value displayed="SeenNo">0</value>
 			<value displayed="SeenYes">1</value>
 		</values>
+		
+		<imageTitleField>series</imageTitleField>
 	</options>
 	
 	<groups>

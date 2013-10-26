@@ -1258,7 +1258,11 @@ use Gtk2;
                     $self->{panel}->$field($info->{$field});
                 }
             }
-            my $title = $info->{$self->{model}->{commonFields}->{title}};
+            
+            # Base the filename of the new image on the imageTitleField, if there is one
+            # Otherwise, just use the model's title field
+            my $titleField = $self->{model}->{options}->{imageTitleField} || $self->{model}->{commonFields}->{title};
+            my $title = $info->{$titleField};
             my $imagePrefix = $self->{imagePrefix};
             foreach my $pic(@picFields)
             {
