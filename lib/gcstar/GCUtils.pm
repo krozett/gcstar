@@ -233,12 +233,10 @@ sub quote
             my $string = '';
             foreach (@{$value})
             {
-                my $val0 = (exists $_->[0]) ? $_->[0] : '';
-                my $val1 = '';
-                $val1 = '('.$_->[1].')' if defined ($_->[1]);
-                $string .= "$val0 $val1, ";
+                $string .= $_->[0];
+                $string .= ' ('.$_->[1].')' if ($_->[1]);
+                $string .= ", ";
             }
-            $string =~ s/ \(\)//g;
             $string =~ s/, $//;
             return $string;
         }
