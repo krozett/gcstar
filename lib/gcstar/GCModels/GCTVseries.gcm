@@ -63,10 +63,10 @@ name="GCTVseries">
 			<value displayed="SeenNo">0</value>
 			<value displayed="SeenYes">1</value>
 		</values>
-		
+
 		<imageTitleField>series</imageTitleField>
 	</options>
-	
+
 	<groups>
 		<group id="main" label="Main"/>
 		<group id="info" label="General"/>
@@ -77,7 +77,7 @@ name="GCTVseries">
 	<random>
 		<filter field="seen" comparison="eq" numeric="true" value="0" after="1"/>
 	</random>
-	
+
 	<fields lending="true" tags="true">
 		<field value="id"
 				type="number"
@@ -208,7 +208,7 @@ name="GCTVseries">
 				type="double list"
 				label="Actors"
 				label1="Actor"
-				label2="Role"				
+				label2="Role"
 				init=""
 				group="info"
 				history="false"
@@ -223,7 +223,7 @@ name="GCTVseries">
 				type="double list"
 				label="Episodes"
 				label1="Episode"
-				label2="Name"				
+				label2="Name"
 				init=""
 				group="episodelist"
 				history="false"
@@ -281,7 +281,7 @@ name="GCTVseries">
 				group="main"
 				imported="true"/>
 	</fields>
-	
+
 	<filters>
 		<group label="General">
 			<filter field="title" comparison="contain"/>
