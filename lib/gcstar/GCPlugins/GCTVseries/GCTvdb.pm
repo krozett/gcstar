@@ -53,7 +53,7 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
             foreach my $series ( @{$xml->{Series}})
             {
                 $self->{itemIdx}++;
-                $self->{itemsList}[$self->{itemIdx}]->{nextUrl} = "http://www.thetvdb.com/api/A8CC4AF70D0385F3/series/".$series->{id}."/all/".$self->siteLanguage().".xml";
+                $self->{itemsList}[$self->{itemIdx}]->{nextUrl} = "http://thetvdb.com/api/A8CC4AF70D0385F3/series/".$series->{id}."/all/".$self->siteLanguage().".xml";
                 $self->{itemsList}[$self->{itemIdx}]->{series} = $series->{SeriesName};
                 $self->{itemsList}[$self->{itemIdx}]->{firstaired} = $series->{FirstAired};
             }
@@ -70,7 +70,7 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                 );
 
                 # Need to grab the banners info too
-                my $response = $ua->get('http://www.thetvdb.com/api/A8CC4AF70D0385F3/series/'.$xml->{Episode}[0]->{seriesid}.'/banners.xml');
+                my $response = $ua->get('http://thetvdb.com/api/A8CC4AF70D0385F3/series/'.$xml->{Episode}[0]->{seriesid}.'/banners.xml');
                 my $result;
                 eval {
                     $result = $response->decoded_content;
@@ -121,12 +121,12 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                                 if (!ref($episode->{filename}));
                         }
 
-                        # For normal seasons, scan through all banners until the first is found matching that season
+                        # For normal seasons, scan through all banners until the first season-type is found matching that season
                         else
                         {
                             foreach my $banner (@{$bannersxml->{Banner}})
                             {
-                                if ($banner->{Season} == $episode->{SeasonNumber})
+                                if ($banner->{BannerType} eq 'season' && $banner->{Season} == $episode->{SeasonNumber})
                                 {
                                     $bannerImage = $banner->{BannerPath};
                                     last;
@@ -181,13 +181,13 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                         {
                             $self->{itemsList}[$self->{itemIdx}]->{firstaired} = $episode->{FirstAired}
                                 if (!ref($episode->{FirstAired}));
-                            $self->{itemsList}[$self->{itemIdx}]->{url} = "http://www.thetvdb.com/?tab=episode&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&id=".$episode->{id};
+                            $self->{itemsList}[$self->{itemIdx}]->{url} = "http://thetvdb.com/?tab=episode&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&id=".$episode->{id}."&lid=".$self->siteLanguageCode();
                         }
                         else
                         {
                             $self->{itemsList}[$self->{itemIdx}]->{firstaired} = $xml->{Series}->{FirstAired}
                                 if (!ref($xml->{Series}->{FirstAired}));
-                            $self->{itemsList}[$self->{itemIdx}]->{url} = "http://www.thetvdb.com/?tab=season&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&lid=".$self->siteLanguageCode();
+                            $self->{itemsList}[$self->{itemIdx}]->{url} = "http://thetvdb.com/?tab=season&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&lid=".$self->siteLanguageCode();
                         }
                         $self->{itemsList}[$self->{itemIdx}]->{actors} = $xml->{Series}->{Actors}
                             if (!ref($xml->{Series}->{Actors}));
@@ -200,6 +200,11 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
             }
             elsif ($self->{pass} != 2)
             {
+                # Only specials have IDs
+                my $special = defined($self->{id});
+                my $series;
+                my $episode;
+
                 # Process a given url
                 $xml = $xs->XMLin(
                     $page,
@@ -207,30 +212,58 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                     KeyAttr    => [],
                 );
 
-                # Need to grab the banners info too
-                my $response = $ua->get('http://www.thetvdb.com/api/A8CC4AF70D0385F3/series/'.$self->{seriesid}.'/banners.xml');
-                my $result;
-                eval {
-                    $result = $response->decoded_content;
-                };
-                my $bannersxml = $xs->XMLin(
-                    $result,
-                    ForceArray => ['Banner'],
-                    KeyAttr    => [],
-                );
-
-                $self->{curInfo}->{series} = $xml->{Series}->{SeriesName}
-                    if (!ref($xml->{Series}->{SeriesName}));
-                $self->{curInfo}->{synopsis} = $xml->{Series}->{Overview}
-                    if (!ref($xml->{Series}->{Overview}));
-                $self->{curInfo}->{firstaired} = $xml->{Series}->{FirstAired}
-                    if (!ref($xml->{Series}->{FirstAired}));
-                $self->{curInfo}->{time} = $xml->{Series}->{Runtime}
-                    if (!ref($xml->{Series}->{Runtime}));
-
-                if (!ref($xml->{Series}->{Actors}))
+                # If doing a special, we need to get base series info too
+                # because the XML only has this episode's info
+                if ($special)
                 {
-                    my $actorString = $xml->{Series}->{Actors};
+                    my $response = $ua->get('http://thetvdb.com/api/A8CC4AF70D0385F3/series/'.$self->{seriesid}.'/'.$self->siteLanguage().'.xml');
+                    my $result;
+                    eval {
+                        $result = $response->decoded_content;
+                    };
+                    my $seriesxml = $xs->XMLin(
+                        $result,
+                        KeyAttr    => [],
+                    );
+                    $series = $seriesxml->{Series};
+                    $episode = $xml->{Episode}[0];
+                }
+                else
+                {
+                    $series = $xml->{Series};
+                    $episode = $xml->{Episode};
+                }
+
+                # Need to grab the banners info too, unless it's a special
+                my $bannersxml;
+                if (!$special)
+                {
+                    my $response = $ua->get('http://thetvdb.com/api/A8CC4AF70D0385F3/series/'.$self->{seriesid}.'/banners.xml');
+                    my $result;
+                    eval {
+                        $result = $response->decoded_content;
+                    };
+                    $bannersxml = $xs->XMLin(
+                        $result,
+                        ForceArray => ['Banner'],
+                        KeyAttr    => [],
+                    );
+                }
+
+                $self->{curInfo}->{series} = $series->{SeriesName}
+                    if (!ref($series->{SeriesName}));
+                $self->{curInfo}->{time} = $series->{Runtime}
+                    if (!ref($series->{Runtime}));
+
+                my $infoSource = $special ? $episode : $series;
+                $self->{curInfo}->{synopsis} = $infoSource->{Overview}
+                    if (!ref($infoSource->{Overview}));
+                $self->{curInfo}->{firstaired} = $infoSource->{FirstAired}
+                    if (!ref($infoSource->{FirstAired}));
+
+                if (!ref($series->{Actors}))
+                {
+                    my $actorString = $series->{Actors};
                     $actorString =~ s/^\|//;
                     $actorString =~ s/\|$//;
                     for my $actor (split(/\|/, $actorString))
@@ -239,9 +272,9 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                     }
                 }
 
-                if (!ref($xml->{Series}->{Genre}))
+                if (!ref($series->{Genre}))
                 {
-                    my $genreString = $xml->{Series}->{Genre};
+                    my $genreString = $series->{Genre};
                     $genreString =~ s/^\|//;
                     $genreString =~ s/\|$//;
                     for my $genre (split(/\|/, $genreString))
@@ -250,64 +283,80 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                     }
                 }
 
-                # Find corresponding season number
-                foreach my $episode (@{$xml->{Episode}})
+                # Handle episodes for non-specials
+                if (!$special)
                 {
-                    if (($episode->{seasonid} == $self->{seasonid})
-                           && (!$self->{curInfo}->{season}))
+                    my $seasonEpisodes;
+                    my $episodePos = 0;
+                    foreach my $checkEpisode (@{$episode})
                     {
-                        $self->{curInfo}->{season} = $episode->{SeasonNumber};
-                        $self->{curInfo}->{webPage}  = "http://www.thetvdb.com/?tab=season&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&lid=".$self->siteLanguageCode();
+                        # Episode is from this season
+                        if ($checkEpisode->{seasonid} == $self->{seasonid})
+                        {
+                            # Add to the episode list if it's valid
+                            if (($checkEpisode->{EpisodeNumber} != 0) || (!ref($checkEpisode->{EpisodeName})))
+                            {
+                                # Prefer dvd episode numbers
+                                if (ref($checkEpisode->{DVD_episodenumber}))
+                                {
+                                    push (@{$seasonEpisodes},[ $checkEpisode->{EpisodeNumber}]);
+                                }
+                                else
+                                {
+                                    my $trimmedEpNumber = $checkEpisode->{DVD_episodenumber};
+                                    $trimmedEpNumber =~ /^(\d*)/;
+                                    push (@{$seasonEpisodes},[  $1]);
+                                }
+
+                                push @{$seasonEpisodes->[ $episodePos ]}, $checkEpisode->{EpisodeName};
+                                $episodePos++;
+                            }
+
+                            # If the series is missing the season #, get that and the web page
+                            if (!$self->{curInfo}->{season})
+                            {
+                                $self->{curInfo}->{season} = $checkEpisode->{SeasonNumber};
+                                $self->{curInfo}->{webPage}  = "http://thetvdb.com/?tab=season&seriesid=".$checkEpisode->{seriesid}."&seasonid=".$checkEpisode->{seasonid}."&lid=".$self->siteLanguageCode();
+                            }
+                        }
+                    }
+
+                    # If we found episodes, sort them
+                    if (scalar( $seasonEpisodes) > 0)
+                    {
+                        my @sortedSeasonEpisodes = sort{ $a->[ 0 ] <=> $b->[ 0 ] } @{$seasonEpisodes};
+                        @{$self->{curInfo}->{episodes}} = @sortedSeasonEpisodes;
                     }
                 }
 
-                my $seasonEpisodes;
-                # Episodes
-                my $episodePos = 0;
-                foreach my $checkEpisode (@{$xml->{Episode}})
+                # For specials, use the episode's image as the banner
+                my $bannerImage;
+                if ($special)
                 {
-                    if (($checkEpisode->{EpisodeNumber} != 0) || (!ref($checkEpisode->{EpisodeName})))
-                    {
-                        # Prefer dvd episode numbers
-                        if (($checkEpisode->{DVD_season} == $self->{curInfo}->{season})
-                            || ((ref($checkEpisode->{DVD_season})) && ($checkEpisode->{SeasonNumber} == $self->{curInfo}->{season})))
-                        {
-                            if (ref($checkEpisode->{DVD_episodenumber}))
-                            {
-                                push (@{$seasonEpisodes},[ $checkEpisode->{EpisodeNumber}]);
-                            }
-                            else
-                            {
-                                my $trimmedEpNumber = $checkEpisode->{DVD_episodenumber};
-                                $trimmedEpNumber =~ /^(\d*)/;
-                                push (@{$seasonEpisodes},[  $1]);
-                            }
+                    $bannerImage = $episode->{filename}
+                        if (!ref($episode->{filename}));
+                }
 
-                            push @{$seasonEpisodes->[ $episodePos ]}, $checkEpisode->{EpisodeName};
-                            $episodePos++;
+                # For normal seasons, scan through all banners until the first season-type is found matching that season
+                else
+                {
+                    foreach my $banner (@{$bannersxml->{Banner}})
+                    {
+                        if ($banner->{BannerType} eq 'season' && $banner->{Season} == $self->{curInfo}->{season})
+                        {
+                            $bannerImage = $banner->{BannerPath};
+                            last;
                         }
                     }
                 }
 
-                # If we found episodes, sort them
-                if (scalar( $seasonEpisodes) > 0)
+                if ($bannerImage)
                 {
-                    my @sortedSeasonEpisodes = sort{ $a->[ 0 ] <=> $b->[ 0 ] } @{$seasonEpisodes};
-                    @{$self->{curInfo}->{episodes}} = @sortedSeasonEpisodes;
-                }
-
-                # Find banner
-                foreach my $banner (@{$bannersxml->{Banner}})
-                {
-                    if ($banner->{Season} == $self->{curInfo}->{season})
-                    {
-                        $self->{curInfo}->{image} = "http://thetvdb.com/banners/".$banner->{BannerPath}
-                            if (!$self->{curInfo}->{image});
-                    }
+                    $self->{curInfo}->{image} = "http://thetvdb.com/banners/".$bannerImage
+                        if (!$self->{curInfo}->{image});
                 }
 
                 $self->{curInfo}->{name} = "temp";
-
             }
             else
             {
@@ -373,8 +422,8 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
 
     sub getSearchUrl
     {
-	my ($self, $word) = @_;
-        return "http://www.thetvdb.com/api/GetSeries.php?seriesname=$word&language=".$self->siteLanguage();
+        my ($self, $word) = @_;
+        return "http://thetvdb.com/api/GetSeries.php?seriesname=$word&language=".$self->siteLanguage();
     }
 
     sub getItemUrl
@@ -384,12 +433,12 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
         {
             # If we're not passed a url, return a hint so that gcstar knows what type
             # of addresses this plugin handles
-            $url = "http://www.thetvdb.com";
+            $url = "http://thetvdb.com";
         }
         elsif (index($url, "api") < 0)
         {
-            # Url isn't for the tvdb api, so we need to find the episode id
-            # and return a url corresponding to the api page for this movie
+            # Url isn't for the tvdb api, so we need to find the series/season/episode id
+            # and return a url corresponding to the api page for this entry
 
             $url =~ /[\?&]id=([0-9]+)*/;
             my $id = $1;
@@ -397,7 +446,19 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
             $self->{seriesid} = $1;
             $url =~ /[\?&]seasonid=([0-9]+)*/;
             $self->{seasonid} = $1;
-            $url = "http://www.thetvdb.com/api/A8CC4AF70D0385F3/series/".$self->{seriesid}."/all/".$self->siteLanguage().".xml";
+
+            # Only specials have ids in the URL, process those as individual episode requests
+            if ($id)
+            {
+                $self->{id} = $id;
+                $url = "http://thetvdb.com/api/A8CC4AF70D0385F3/episodes/".$self->{id}."/".$self->siteLanguage().".xml";
+            }
+
+            # Process season entries as series requests
+            else
+            {
+                $url = "http://thetvdb.com/api/A8CC4AF70D0385F3/series/".$self->{seriesid}."/all/".$self->siteLanguage().".xml";
+            }
         }
         return $url;
     }
