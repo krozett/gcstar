@@ -126,7 +126,7 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                         {
                             foreach my $banner (@{$bannersxml->{Banner}})
                             {
-                                if ($banner->{BannerType} eq 'season' && $banner->{Season} == $episode->{SeasonNumber})
+                                if ($banner->{BannerType2} eq 'season' && $banner->{Season} == $episode->{SeasonNumber})
                                 {
                                     $bannerImage = $banner->{BannerPath};
                                     last;
@@ -342,7 +342,7 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                 {
                     foreach my $banner (@{$bannersxml->{Banner}})
                     {
-                        if ($banner->{BannerType} eq 'season' && $banner->{Season} == $self->{curInfo}->{season})
+                        if ($banner->{BannerType2} eq 'season' && $banner->{Season} == $self->{curInfo}->{season})
                         {
                             $bannerImage = $banner->{BannerPath};
                             last;
