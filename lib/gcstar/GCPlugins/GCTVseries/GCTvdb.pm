@@ -181,12 +181,16 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                         {
                             $self->{itemsList}[$self->{itemIdx}]->{firstaired} = $episode->{FirstAired}
                                 if (!ref($episode->{FirstAired}));
+                            $self->{itemsList}[$self->{itemIdx}]->{ratingpress} = int($episode->{Rating} + 0.5)
+                                if (!ref($episode->{Rating}));
                             $self->{itemsList}[$self->{itemIdx}]->{url} = "http://thetvdb.com/?tab=episode&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&id=".$episode->{id}."&lid=".$self->siteLanguageCode();
                         }
                         else
                         {
                             $self->{itemsList}[$self->{itemIdx}]->{firstaired} = $xml->{Series}->{FirstAired}
                                 if (!ref($xml->{Series}->{FirstAired}));
+                            $self->{itemsList}[$self->{itemIdx}]->{ratingpress} = int($xml->{Series}->{Rating} + 0.5)
+                                if (!ref($xml->{Series}->{Rating}));
                             $self->{itemsList}[$self->{itemIdx}]->{url} = "http://thetvdb.com/?tab=season&seriesid=".$episode->{seriesid}."&seasonid=".$episode->{seasonid}."&lid=".$self->siteLanguageCode();
                         }
                         $self->{itemsList}[$self->{itemIdx}]->{actors} = $xml->{Series}->{Actors}
@@ -260,6 +264,8 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                     if (!ref($infoSource->{Overview}));
                 $self->{curInfo}->{firstaired} = $infoSource->{FirstAired}
                     if (!ref($infoSource->{FirstAired}));
+                $self->{curInfo}->{ratingpress} = int($infoSource->{Rating} + 0.5)
+                    if (!ref($infoSource->{Rating}));
 
                 if (!ref($series->{Actors}))
                 {
@@ -392,6 +398,7 @@ use GCPlugins::GCTVseries::GCTVseriesCommon;
                 }
 
                 $self->{curInfo}->{time} = $self->{itemsList}[$self->{wantedIdx}]->{runtime};
+                $self->{curInfo}->{ratingpress} = $self->{itemsList}[$self->{wantedIdx}]->{ratingpress};
                 $self->{curInfo}->{image} = $self->{itemsList}[$self->{wantedIdx}]->{image};
                 $self->{curInfo}->{synopsis} = $self->{itemsList}[$self->{wantedIdx}]->{overview};
                 $self->{curInfo}->{webPage} = $self->{itemsList}[$self->{wantedIdx}]->{url};
