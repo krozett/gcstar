@@ -2,7 +2,9 @@ package GCPlugins::GCfilms::GCthemoviedb;
 
 ###################################################
 #
-#  Copyright 2005-2010 Christian Jodar
+#  Copyright 2005-2016 Keith Rozett
+#
+#  Based on earlier work by Christian Jodar (Zombiepig).
 #
 #  This file is part of GCstar.
 #
@@ -26,188 +28,17 @@ use strict;
 use utf8;
 
 use GCPlugins::GCfilms::GCfilmsCommon;
-
 {
-
     package GCPlugins::GCfilms::GCPluginThemoviedb;
 
     use base 'GCPlugins::GCfilms::GCfilmsPluginsBase';
-    use XML::Simple;
+    use JSON;
 
-    sub parse
-    {
-        my ($self, $page) = @_;
-        return if $page =~ /^<!DOCTYPE html/;
-        my $xml;
-        my $xs = XML::Simple->new;
-
-        if ($self->{parsingList})
-        {
-            if ($page !~ m/>Nothing found.<\/movie/)
-            {
-                $xml = $xs->XMLin(
-                    $page,
-                    ForceArray => [ 'movie', 'alternative_name' ],
-                    KeyAttr    => ['id']
-                );
-                my $movie;
-                foreach $movie (keys(%{$xml->{'movies'}->{'movie'}}))
-                {
-                    # We only want movies, not series and everything else the api returns
-                    if ($xml->{'movies'}->{'movie'}->{$movie}->{'type'} eq "movie")
-                    {
-                        $self->{itemIdx}++;
-                        my $url =
-"http://api.themoviedb.org/2.1/Movie.getInfo/".$self->siteLanguage()."/xml/9fc8c3894a459cac8c75e3284b712dfc/"
-                          . $movie;
-      # If the release date is missing, it will be returned as an array, so only save the release if
-      # it's not an array
-                        my $released = "";
-                        if (!ref($xml->{'movies'}->{'movie'}->{$movie}->{'released'}))
-                        {
-                            $released = $xml->{'movies'}->{'movie'}->{$movie}->{'released'};
-                        }
-                        $self->{itemsList}[ $self->{itemIdx} ]->{date} = $released;
-                        $self->{itemsList}[ $self->{itemIdx} ]->{url}  = $url;
-                        $self->{itemsList}[ $self->{itemIdx} ]->{title} =
-                          $xml->{'movies'}->{'movie'}->{$movie}->{'name'};
-                        # Now, check if there's any alternative names, and if so, add them in as
-                        # additional search results.
-                        for my $alternateName (
-                            @{$xml->{'movies'}->{'movie'}->{$movie}->{alternative_name}})
-                        {
-                            if (!ref($alternateName))
-                            {
-                                $self->{itemIdx}++;
-                                $self->{itemsList}[ $self->{itemIdx} ]->{date}  = $released;
-                                $self->{itemsList}[ $self->{itemIdx} ]->{url}   = $url;
-                                $self->{itemsList}[ $self->{itemIdx} ]->{title} = $alternateName;
-                            }
-                        }
-
-                    }
-                }
-            }
-        }
-        else
-        {
-            $xml = $xs->XMLin(
-                $page,
-                ForceArray => [ 'country', 'person', 'category', 'size', 'alternative_name' ],
-                KeyAttr    => ['']
-            );
-            my $usingAlternateName = 0;
-            if (
-                (
-                    $xml->{movies}->{movie}->{name} ne
-                    $self->{itemsList}[ $self->{wantedIdx} ]->{title}
-                )
-                && ($self->{itemsList}[ $self->{wantedIdx} ]->{title})
-              )
-            {
-           # Name returned by tmdb is different to the one the user selected
-           # this means they choose an translated name, so use the name they choose
-           # as the default, and put tmdb's name in as the original (untranslated) name of the movie
-                $self->{curInfo}->{title}    = $self->{itemsList}[ $self->{wantedIdx} ]->{title};
-                $self->{curInfo}->{original} = $xml->{movies}->{movie}->{name};
-            }
-            else
-            {
-                $self->{curInfo}->{title} = $xml->{movies}->{movie}->{name};
-            }
-            # Now, add any alternate names
-            for my $alternateName (@{$xml->{movies}->{movie}->{alternative_name}})
-            {
-                if ((!ref($alternateName)) && ($alternateName ne $self->{curInfo}->{title}))
-                {
-                    $self->{curInfo}->{original} .= ", "
-                      if $self->{curInfo}->{original};
-                    $self->{curInfo}->{original} .= $alternateName;
-                }
-            }
-
-            $self->{curInfo}->{webPage} = $xml->{movies}->{movie}->{url};
-
-          # The following fields could be missing from the xml, so we need to check if they're blank
-          # (in which case they'll be a array)
-            $self->{curInfo}->{synopsis} = $xml->{movies}->{movie}->{overview}
-              if (!ref($xml->{movies}->{movie}->{overview}));
-            $self->{curInfo}->{ratingpress} = $xml->{movies}->{movie}->{rating}
-              if (!ref($xml->{movies}->{movie}->{rating}));
-            $self->{curInfo}->{date} = $xml->{movies}->{movie}->{released}
-              if (!ref($xml->{movies}->{movie}->{released}));
-            $self->{curInfo}->{time} = $xml->{movies}->{movie}->{runtime} . " mins"
-              if (!ref($xml->{movies}->{movie}->{runtime}));
-
-            if (!ref($xml->{movies}->{movie}->{certification}))
-            {
-                my $certification;
-                $certification = $xml->{movies}->{movie}->{certification};
-                $self->{curInfo}->{age} = 1
-                  if ($certification eq 'Unrated') || ($certification eq 'Open');
-                $self->{curInfo}->{age} = 2
-                  if ($certification eq 'G') || ($certification eq 'Approved');
-                $self->{curInfo}->{age} = 5
-                  if ($certification eq 'PG')
-                  || ($certification eq 'M')
-                  || ($certification eq 'GP');
-                $self->{curInfo}->{age} = 13 if $certification eq 'PG-13';
-                $self->{curInfo}->{age} = 17 if $certification eq 'R';
-                $self->{curInfo}->{age} = 18
-                  if ($certification eq 'NC-17') || ($certification eq 'X');
-            }
-
-            for my $country (@{$xml->{movies}->{movie}->{countries}->{country}})
-            {
-                push @{$self->{curInfo}->{country}}, $country->{name};
-            }
-            $self->{curInfo}->{country} =~ s/, $//;
-            for my $person (@{$xml->{movies}->{movie}->{cast}->{person}})
-            {
-                my $name = $person->{name};
-                # Strip any blank spaces from start and end of name
-                $name =~ s/\s*$//;
-                $name =~ s/^\s*//;
-                if ($person->{job} eq "Director")
-                {
-                    $self->{curInfo}->{director} .= $name . ', ';
-                }
-                elsif ($person->{job} eq "Actor")
-                {
-                    if ($self->{actorsCounter} < $GCPlugins::GCfilms::GCfilmsCommon::MAX_ACTORS)
-                    {
-                        push @{$self->{curInfo}->{actors}}, [$name];
-                        my $role = $person->{character};
-                        $role =~ s/\s*$//;
-                        $role =~ s/^\s*//;
-                        push @{$self->{curInfo}->{actors}->[ $self->{actorsCounter} ]}, $role;
-                        $self->{actorsCounter}++;
-                    }
-                }
-            }
-            $self->{curInfo}->{director} =~ s/, $//;
-            for my $category (@{$xml->{movies}->{movie}->{categories}->{category}})
-            {
-                push @{$self->{curInfo}->{genre}}, [ $category->{name} ]
-                  if ($category->{type} eq 'genre');
-            }
-            for my $image (@{$xml->{movies}->{movie}->{images}->{image}})
-            {
-                if ($image->{type} eq "poster")
-                {
-                    # Fetch either the big original pic, or just the small thumbnail pic
-                    if (   (($self->{bigPics}) && ($image->{size} eq "original"))
-                        || (!($self->{bigPics}) && ($image->{size} eq "thumb")))
-                    {
-                        if (!$self->{curInfo}->{image})
-                        {
-                            $self->{curInfo}->{image} = $image->{url};
-                        }
-                    }
-                }
-            }
-        }
-    }
+    my $apiBase = 'http://api.themoviedb.org/3';
+    my $webBase = 'http://www.themoviedb.org';
+    my $imgBase = 'http://image.tmdb.org/t/p';
+    my $imgSize = 'w500';
+    my $key     = '9fc8c3894a459cac8c75e3284b712dfc';
 
     sub new
     {
@@ -219,11 +50,95 @@ use GCPlugins::GCfilms::GCfilmsCommon;
         $self->{hasField} = {
             title    => 1,
             date     => 1,
-            director => 0,
-            actors   => 0,
         };
 
         return $self;
+    }
+
+    sub parse
+    {
+        my ($self, $page) = @_;
+
+        return unless $page =~ /^{/;
+        my $json = decode_json($page);
+
+        if ($self->{parsingList})
+        {
+            $self->parseSearch($json);
+        }
+        else
+        {
+            $self->parseItem($json);
+        }
+    }
+
+    sub parseSearch
+    {
+        my ($self, $json) = @_;
+
+        foreach my $movie (@{$json->{results}})
+        {
+            $self->{itemIdx}++;
+            $self->{itemsList}[$self->{itemIdx}] = {
+                title => $movie->{title},
+                date  => $movie->{release_date},
+                url   => $self->idToApiUrl($movie->{id}),
+            };
+
+            # If the movie's title and original title differ (such as with language differences),
+            # offer the user the original title as a separate entry
+            if ($movie->{title} ne $movie->{original_title})
+            {
+                $self->{itemIdx}++;
+                $self->{itemsList}[$self->{itemIdx}] = {
+                    title => $movie->{original_title},
+                    date  => $movie->{release_date},
+                    url   => $self->idToApiUrl($movie->{id}),
+                };
+            }
+        }
+    }
+
+    sub parseItem
+    {
+        my ($self, $movie) = @_;
+
+        my $title    = $movie->{title};
+        my $original = $movie->{original_title};
+        my $selected = $self->{itemsList}[$self->{wantedIdx}]->{title};
+
+        # If the title matches the original title, no need to store it
+        if ($title eq $original)
+        {
+            $original = '';
+        }
+
+        # If the movie's title doesn't match what the user selected (i.e. they picked the original title),
+        # then use their selection as the real title, and tmdb's translated title as the original
+        elsif ($selected && ($title ne $selected))
+        {
+            $original = $title;
+            $title    = $selected;
+        }
+
+        $self->{curInfo}->{title}       = $title;
+        $self->{curInfo}->{original}    = $original;
+        $self->{curInfo}->{date}        = $movie->{release_date};
+        $self->{curInfo}->{time}        = "$movie->{runtime} mins";
+        $self->{curInfo}->{image}       = "$imgBase/${imgSize}$movie->{poster_path}" if ($movie->{poster_path});
+        $self->{curInfo}->{synopsis}    = $movie->{overview};
+        $self->{curInfo}->{webPage}     = $self->idToWebUrl($movie->{id});
+        $self->{curInfo}->{ratingpress} = int($movie->{vote_average} + 0.5);
+
+        $self->{curInfo}->{country}   = [ map { $_->{name} } @{$movie->{production_countries}} ];
+        $self->{curInfo}->{genre}     = [ map { $_->{name} } @{$movie->{genres}} ];
+
+        # The director(s) are buried in the crew somewhere - let's find them
+        $self->{curInfo}->{director} = join(', ', map { $_->{name} } grep { $_->{job} eq 'Director' } @{$movie->{credits}->{crew}});
+
+        # Grab the first MAX_ACTORS actors
+        splice(@{$movie->{credits}->{cast}}, $GCPlugins::GCfilms::GCfilmsCommon::MAX_ACTORS);
+        $self->{curInfo}->{actors} = [ map { [ $_->{name}, $_->{character} ] } @{$movie->{credits}->{cast}} ];
     }
 
     sub getItemUrl
@@ -234,22 +149,31 @@ use GCPlugins::GCfilms::GCfilmsCommon;
         {
             # If we're not passed a url, return a hint so that gcstar knows what type
             # of addresses this plugin handles
-            $url = "http://www.themoviedb.org";
+            $url = $webBase;
         }
-        elsif (index($url, "api") < 0)
+        elsif (index($url, $apiBase) < 0)
         {
-            # Url isn't for the movie db api, so we need to find the movie id
-            # and return a url corresponding to the api page for this movie
-            my $found = index(reverse($url), "/");
-            if ($found >= 0)
+            # Not an API URL, so let's try to grab a numeric ID
+            if ($url =~ m|/movie/(\d+)|)
             {
-                my $id = substr(reverse($url), 0, $found);
-                $url =
-"http://api.themoviedb.org/2.1/Movie.getInfo/".$self->siteLanguage()."/xml/9fc8c3894a459cac8c75e3284b712dfc/"
-                  . reverse($id);
+                $url = $self->idToApiUrl($1);
             }
         }
         return $url;
+    }
+
+    sub idToApiUrl
+    {
+        my ($self, $id) = @_;
+
+        return "$apiBase/movie/$id?api_key=$key&append_to_response=credits&language=" . $self->siteLanguage();
+    }
+
+    sub idToWebUrl
+    {
+        my ($self, $id) = @_;
+
+        return "$webBase/movie/$id?language=" . $self->siteLanguage();
     }
 
     sub preProcess
@@ -267,8 +191,7 @@ use GCPlugins::GCfilms::GCfilmsCommon;
     sub getSearchUrl
     {
         my ($self, $word) = @_;
-        return
-"http://api.themoviedb.org/2.1/Movie.search/".$self->siteLanguage()."/xml/9fc8c3894a459cac8c75e3284b712dfc/$word";
+        return "$apiBase/search/movie?api_key=$key&language=" . $self->siteLanguage() . "&query=$word";
     }
 
     sub changeUrl
@@ -277,11 +200,11 @@ use GCPlugins::GCfilms::GCfilmsCommon;
         # Make sure the url is for the api, not the main movie page
         return $self->getItemUrl($url);
     }
-    
+
     sub siteLanguage
     {
         my $self = shift;
-        
+
         return 'en';
     }
 
@@ -292,7 +215,7 @@ use GCPlugins::GCfilms::GCfilmsCommon;
 
     sub getAuthor
     {
-        return 'Zombiepig';
+        return 'KeroHazel';
     }
 
     sub getLang
@@ -332,6 +255,21 @@ use GCPlugins::GCfilms::GCfilmsCommon;
         return 1;
     }
 
+    sub needsLanguageTest
+    {
+        return 1;
+    }
+
+    sub testURL
+    {
+        my ($self, $url) = @_;
+
+        # If the URL lacks a language, assume English
+        $url .= '?language=en' if ($url !~ /\?language=/);
+
+        my $lang = $self->siteLanguage();
+        return $url =~ /\?language=$lang$/;
+    }
 }
 
 1;
