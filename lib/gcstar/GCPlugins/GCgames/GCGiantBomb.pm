@@ -178,8 +178,6 @@ use GCPlugins::GCgames::GCgamesCommon;
         my ($self, $word) = @_;
 
         # Temporary hack to allow paging through large result sets
-        #$word =~ s/%26page%3D(\d+)$//i;
-        #my $page = $1 || 1;
         $word =~ s/%26offset%3D(\d+)$//i;
         my $offset = $1 || 0;
 
